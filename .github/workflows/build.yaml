@@ -65,4 +65,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.build.outputs.version }}
-          files: "dhlibs-*-dist*"
+          files: |
+            *.whl
+            *.tar.gz
