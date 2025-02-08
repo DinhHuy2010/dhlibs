@@ -1,34 +1,64 @@
-name: "Build wheels"
+name: "Build wheels and change version"
 on:
   push:
     branches:
-      - dev/master
+      - dev/**
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.theversion.outputs.DHLIBS_VERSION }}
     steps:
-      - name: check code
+      - name: Checkout code
         uses: actions/checkout@v4
-      - name: setup python 3.11
+
+      - name: Setup Python 3.11
         uses: actions/setup-python@v4
         with:
           python-version: "3.11"
 
-      - name: Install poetry
+      - name: Install Poetry
         run: |
           pip install --upgrade pip
           pip install poetry build
-  
+
       - name: Install dependencies
-        run: |
-          poetry install
-      
+        run: poetry install
+
       - name: Build artifacts
+        run: python -m build
+
+      - name: Get version
+        id: theversion  # Set step ID
         run: |
-          python -m build
-      
+          DHLIBS_VERSION="$(poetry version -s)+g$(git rev-parse --short HEAD)"
+          echo "Version is $DHLIBS_VERSION"
+          echo "DHLIBS_VERSION=$DHLIBS_VERSION" >> $GITHUB_ENV
+          echo "DHLIBS_VERSION=$DHLIBS_VERSION" >> $GITHUB_OUTPUT  # Correct output key
+
       - name: Upload all artifacts
         uses: actions/upload-artifact@v4.5.0
         with:
-          name: dist
+          name: dhlibs-${{ env.DHLIBS_VERSION }}-dist  # Correct artifact name
           path: dist/*
+
+  release-dev:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Get info
+        run: echo "Version is ${{ needs.build.outputs.version }}"
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download built files
+        uses: actions/download-artifact@v4
+        with:
+          name: dhlibs-${{ needs.build.outputs.version }}-dist  # Ensure matching name
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: "dhlibs-*-dist.*"
